@@ -16,7 +16,19 @@ urlpatterns = [
         name='redoc'
     ),
     path('auth/', include('djoser.urls')),
-    path('api/v1/jwt/create/', TokenObtainPairView.as_view(), name='jwt-create'),
-    path('api/v1/jwt/refresh/', TokenRefreshView.as_view(), name='jwt-refresh'),
-    path('api/v1/jwt/verify/', TokenVerifyView.as_view(), name='jwt-verify'),
+    path(
+        'api/v1/jwt/create/',
+        TokenObtainPairView.as_view(),
+        name='jwt-create'
+    ),
+    path(
+        'api/v1/jwt/refresh/',
+        TokenRefreshView.as_view(),
+        name='jwt-refresh'
+    ),
+    path(
+        'api/v1/jwt/verify/',
+        TokenVerifyView.as_view(),
+        name='jwt-verify'
+    ),
 ]
