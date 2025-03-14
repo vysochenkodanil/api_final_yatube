@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, viewsets
-from rest_framework.exceptions import ValidationError
 
 from posts.models import Comment, Group, Post, Follow
 from .permissions import IsAuthorOrReadOnly
@@ -11,7 +10,8 @@ from .serializers import (
     PostSerializer,
     FollowSerializer,
 )
-from api.pagination import PostPagination
+from .pagination import PostPagination
+from .filters import FollowFilter
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -25,19 +25,8 @@ class PostViewSet(viewsets.ModelViewSet):
     ]
     pagination_class = PostPagination
 
-    def get_queryset(self):
-        """Проверяет на наличие лимита и офсета в запросе."""
-        queryset = super().get_queryset()
-        if (
-            'limit' in self.request.query_params
-            or 'offset' in self.request.query_params
-        ):
-            self.pagination_class = PostPagination
-        else:
-            self.pagination_class = None
-        return queryset
-
     def perform_create(self, serializer):
+        """Создает пост и устанавливает автора."""
         serializer.save(author=self.request.user)
 
 
@@ -47,8 +36,8 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
     permission_classes = [
-        IsAuthorOrReadOnly,
         permissions.IsAuthenticatedOrReadOnly,
+        IsAuthorOrReadOnly,
     ]
 
 
@@ -74,28 +63,18 @@ class CommentViewSet(viewsets.ModelViewSet):
 
 
 class FollowViewSet(viewsets.ModelViewSet):
-    """ViewSet для работы с фоловерами."""
+    """ViewSet для работы с подписками."""
+
     serializer_class = FollowSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['following__username']
+    filterset_class = FollowFilter
+    http_method_names = ['get', 'post']
 
     def get_queryset(self):
-        """Фильтрует фоловеров."""
-        queryset = Follow.objects.filter(user=self.request.user)
-        search_query = self.request.query_params.get('search', None)
-        if search_query:
-            queryset = queryset.filter(
-                following__username__icontains=search_query
-            )
-        return queryset
+        """Возвращает подписки текущего пользователя."""
+        return Follow.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        """Создает подписки и проверяет их корректность."""
-        user = self.request.user
-        following = serializer.validated_data['following']
-        if user == following:
-            raise ValidationError('Нельзя подписаться на самого себя.')
-        if Follow.objects.filter(user=user, following=following).exists():
-            raise ValidationError('Вы уже подписаны на этого пользователя.')
-        serializer.save(user=user)
+        """Создает подписку и проверяет её корректность."""
+        serializer.save(user=self.request.user)
